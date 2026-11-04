@@ -1,0 +1,1064 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Approved Profile Feed</title>
+<style>html{color-scheme:light}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow column with three views. Setup lists the source projects, the feed shows one approved profile with its comments, the useful list collects what you kept. */
+:root {
+  --bg: #f2f4f3;
+  --surface: #ffffff;
+  --ink: #15201d;
+  --muted: #5a6a65;
+  --line: #dde3e0;
+  --accent: #3a41c6;
+  --accent-ink: #ffffff;
+  --found: #17713f;
+  --found-bg: #e3f3ea;
+  --miss: #a3441a;
+  --miss-bg: #fbe9e0;
+  --warn-bg: #fdf3d8;
+  --warn: #7a5a00;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1514;
+    --surface: #172120;
+    --ink: #e7efec;
+    --muted: #92a39d;
+    --line: #2a3836;
+    --accent: #9aa0ff;
+    --accent-ink: #0f1514;
+    --found: #5fd196;
+    --found-bg: #12301f;
+    --miss: #f0996b;
+    --miss-bg: #3a1e12;
+    --warn-bg: #3a2f0d;
+    --warn: #e8c55f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1514;
+  --surface: #172120;
+  --ink: #e7efec;
+  --muted: #92a39d;
+  --line: #2a3836;
+  --accent: #9aa0ff;
+  --accent-ink: #0f1514;
+  --found: #5fd196;
+  --found-bg: #12301f;
+  --miss: #f0996b;
+  --miss-bg: #3a1e12;
+  --warn-bg: #3a2f0d;
+  --warn: #e8c55f;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+.view { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(26px, 5vw, 34px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0;
+  text-wrap: balance;
+}
+.lede { margin: 8px 0 0; color: var(--muted); max-width: 60ch; }
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+h2.label { font-family: var(--font-body); }
+.hint { margin: 0; font-size: 13px; color: var(--muted); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+button, .btn {
+  font: inherit;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 8px 14px;
+  cursor: pointer;
+}
+button:hover:not(:disabled), a.btn:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.primary:hover:not(:disabled) { filter: brightness(1.08); border-color: var(--accent); }
+button:disabled { opacity: 0.55; cursor: default; }
+button.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+a.btn { display: inline-block; text-decoration: none; text-align: center; }
+button:focus-visible, a:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+select, input[type="text"], input[type="search"], textarea.brief-input {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  max-width: 100%;
+  width: 100%;
+}
+textarea.brief-input { resize: vertical; min-height: 64px; }
+
+/* Setup */
+.drop {
+  background: var(--surface);
+  border: 1.5px dashed var(--line);
+  border-radius: 12px;
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.drop p { margin: 0; color: var(--muted); }
+#v-setup.over .drop, #v-setup.over .proj { border-color: var(--accent); }
+.projs { display: flex; flex-direction: column; gap: 12px; }
+.proj {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.proj-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.inc { display: flex; gap: 10px; align-items: flex-start; min-width: 0; cursor: pointer; }
+.inc input { margin: 4px 0 0; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+.pname { font-weight: 600; overflow-wrap: anywhere; }
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  margin-left: 8px;
+  vertical-align: 1px;
+}
+.p-stats { margin: 0 0 0 28px; color: var(--muted); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.p-stats .warn { color: var(--warn); font-weight: 500; }
+details.rules > summary { cursor: pointer; color: var(--accent); font-weight: 500; font-size: 14px; margin-left: 28px; width: fit-content; }
+.fields { display: flex; flex-direction: column; gap: 18px; padding-top: 14px; margin-left: 28px; min-width: 0; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; border: 0; padding: 0; margin: 0; }
+.field > label, .field > legend { font-size: 13px; font-weight: 600; padding: 0; }
+.checks { display: flex; flex-direction: column; gap: 6px; }
+.checks label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.checks input, .vt input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+.vt-wrap { overflow-x: auto; min-width: 0; }
+.vt { width: 100%; border-collapse: collapse; font-size: 14px; }
+.vt caption { text-align: left; font-size: 13px; color: var(--muted); padding-bottom: 6px; }
+.vt th { text-align: left; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 4px 8px 4px 0; }
+.vt td { padding: 7px 8px 7px 0; border-top: 1px solid var(--line); vertical-align: middle; overflow-wrap: anywhere; }
+.vt .num { text-align: right; font-variant-numeric: tabular-nums; padding-right: 16px; }
+.addbar { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; margin-top: 12px; }
+.notice { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 10px 12px; font-size: 14px; margin-top: 8px; }
+.startpanel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.start-row { display: flex; align-items: flex-end; gap: 12px 16px; flex-wrap: wrap; }
+.start-row .field { width: 180px; }
+.start-row button.primary { padding: 10px 20px; font-size: 16px; }
+.pool { margin: 0; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+
+/* Feed */
+.hud { display: flex; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; }
+.bar { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.profile { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); min-width: 0; width: 100%; }
+.url { font-family: var(--font-mono); font-size: 15px; margin: 0; overflow-wrap: anywhere; }
+.src { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.src-head { display: flex; gap: 6px 10px; align-items: center; flex-wrap: wrap; }
+.sname { font-weight: 600; overflow-wrap: anywhere; }
+.status { display: inline-block; font-size: 13px; font-weight: 500; background: var(--found-bg); color: var(--found); border-radius: 999px; padding: 2px 11px; overflow-wrap: anywhere; }
+.cms { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.cms li { background: var(--bg); border-radius: 8px; padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; }
+.who { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.txt { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.q { font-family: var(--font-display); font-weight: 600; font-size: clamp(20px, 4vw, 24px); line-height: 1.2; margin: 0; text-wrap: balance; }
+.decide { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.dec { padding: 14px 8px; font-size: 18px; font-weight: 600; font-family: var(--font-display); }
+.dec.on-u { background: var(--found-bg); border-color: var(--found); color: var(--found); }
+.dec.on-n { background: var(--miss-bg); border-color: var(--miss); color: var(--miss); }
+.dec.on-s { background: var(--line); border-color: var(--muted); }
+kbd { font-family: var(--font-mono); font-size: 12px; border: 1px solid currentColor; border-radius: 4px; padding: 0 5px; margin-left: 8px; opacity: 0.65; font-weight: 400; }
+@media (hover: none) { kbd { display: none; } }
+.nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.end-row { display: flex; justify-content: center; gap: 8px 24px; flex-wrap: wrap; }
+.endcard { align-items: flex-start; }
+.endcard h2 { font-family: var(--font-display); font-size: 24px; margin: 0; }
+.endcard p { margin: 0; color: var(--muted); }
+.idle { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; color: var(--muted); }
+
+/* Useful list */
+.short-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; }
+.short-head h2 { font-family: var(--font-display); font-size: 24px; margin: 0; letter-spacing: -0.01em; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.sl { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.sl > li { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sl > li + li { border-top: 1px solid var(--line); }
+.sl a.u { font-family: var(--font-mono); font-size: 14px; overflow-wrap: anywhere; color: var(--accent); }
+.sl .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px 12px; flex-wrap: wrap; }
+.sl .note { margin: 0; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { font-size: 13px; background: var(--bg); border-radius: 999px; padding: 2px 11px; overflow-wrap: anywhere; }
+details.more > summary { cursor: pointer; font-size: 14px; font-weight: 500; }
+details.more .cms { margin-top: 8px; }
+.fallback textarea { width: 100%; min-height: 120px; font-family: var(--font-mono); font-size: 13px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+
+@media (max-width: 480px) {
+  body { padding-block: 24px 48px; }
+  .card { padding: 20px 16px; }
+  .fields, .p-stats, details.rules > summary { margin-left: 0; }
+  .dec { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Approved Profile Feed</h1>
+    <p class="lede" id="lede">Add the sourcing sheets from your other projects. The feed shows every approved profile with what the team said about it, so you can keep the ones that fit your project.</p>
+  </header>
+
+  <section class="view" id="v-setup" aria-label="Source projects">
+    <div>
+      <h2 class="label">Source projects</h2>
+      <div id="projects"></div>
+      <div id="busy" class="hint" role="status" aria-live="polite"></div>
+      <div id="notes" aria-live="polite"></div>
+    </div>
+    <div class="startpanel" id="startpanel" hidden>
+      <div class="field">
+        <label for="target">I am reviewing these for</label>
+        <input type="text" id="target" list="targets" placeholder="Your project name" autocomplete="off">
+        <datalist id="targets"></datalist>
+        <p class="hint">Your Useful and Not useful marks are saved under this name. Use a different name later to review the same profiles for another project.</p>
+      </div>
+      <div class="start-row">
+        <div class="field">
+          <label for="order">Order</label>
+          <select id="order">
+            <option value="sheet">Sheet order</option>
+            <option value="random">Shuffled</option>
+          </select>
+        </div>
+        <button type="button" id="reshuffle" hidden>Reshuffle</button>
+        <button type="button" class="primary" id="start">Start reviewing</button>
+      </div>
+      <p class="pool" id="pool"></p>
+      <div><button type="button" class="link" id="to-short" hidden></button></div>
+    </div>
+    <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.csv,.tsv,.ods" multiple hidden>
+  </section>
+
+  <section class="view" id="v-feed" hidden aria-label="Profile feed"></section>
+  <section class="view" id="v-short" hidden aria-label="Useful profiles"></section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) { return n.toLocaleString(); }
+  function norm(s) { return String(s == null ? '' : s).trim().replace(/\s+/g, ' ').toLowerCase(); }
+
+  var PROJ_KEY = 'approved-feed-projects-v1';
+  var DEC_KEY = 'approved-feed-decisions-v1';
+  var CMT_RE = /comment|feedback|reason|note|remark|rationale|why/i;
+  var PROFILE_RE = /(?:^|[^a-z0-9-])((?:https?:\/\/)?(?:[a-z0-9-]+\.)*linkedin\.com\/(in|pub)\/([^\s"'<>,;|()\[\]]+))/i;
+
+  var projects = [];
+  var store = { v: 1, current: 'My project', kw: '', targets: {} };
+  var feed = null;
+  var view = 'setup';
+  var uid = 0;
+  var persistFailed = false;
+  var problems = [];
+  var ui = { open: {} };
+
+  /* ---------- Profile URLs ---------- */
+  function extractProfile(text) {
+    var m = PROFILE_RE.exec(String(text || ''));
+    if (!m) return null;
+    var type = m[2].toLowerCase();
+    var raw = m[3].split(/[?#]/)[0];
+    var dec = raw;
+    try { dec = decodeURIComponent(raw); } catch (e) {}
+    var segs = dec.split('/').filter(Boolean);
+    var rawSegs = raw.split('/').filter(Boolean);
+    if (!segs.length) return null;
+    var n = type === 'pub' ? segs.length : 1;
+    var slug = segs.slice(0, n).join('/').replace(/[.,]+$/, '');
+    var rawSlug = rawSegs.slice(0, n).join('/').replace(/[.,]+$/, '');
+    if (!slug) return null;
+    return { key: type + '/' + slug.toLowerCase(), href: 'https://www.linkedin.com/' + type + '/' + rawSlug + '/', label: 'linkedin.com/' + type + '/' + slug };
+  }
+
+  /* ---------- Reading spreadsheets ---------- */
+  function sheetToMatrix(ws) {
+    if (!ws || !ws['!ref']) return [];
+    var rg = XLSX.utils.decode_range(ws['!ref']);
+    var out = [];
+    for (var r = rg.s.r; r <= rg.e.r; r++) {
+      var row = [];
+      for (var c = rg.s.c; c <= rg.e.c; c++) {
+        var cell = ws[XLSX.utils.encode_cell({ r: r, c: c })];
+        var t = '';
+        if (cell) {
+          t = cell.w != null ? String(cell.w) : (cell.v != null ? String(cell.v) : '');
+          var l = cell.l && cell.l.Target ? String(cell.l.Target) : '';
+          if (l && /linkedin\.com/i.test(l) && !/linkedin\.com/i.test(t)) t = t ? t + ' ' + l : l;
+        }
+        row.push(t);
+      }
+      out.push(row);
+    }
+    return out;
+  }
+
+  function classify(v) {
+    var s = String(v).toLowerCase();
+    if (/reject|declin|not a fit|no fit|disqualif|\bpass(ed)?\b|maybe|later|hold|skip|\bno\b|dismiss|withdr|not approved|unapprov|disapprov/.test(s)) return 'no';
+    if (/approv|initiat|interest|accept|advance|proceed|shortlist|intro call|contacted|replied|\byes\b|hire|offer/.test(s)) return 'yes';
+    return 'skip';
+  }
+
+  function pickOutcomeCol(cols, kinds) {
+    var pats = [/outreach status/i, /decision|outcome|final|^status$/i, /peer review|^review$/i, /status|verdict/i];
+    var skip = /email|icebreaker|processed|delivery|interview|copilot|campaign/i;
+    for (var p = 0; p < pats.length; p++) {
+      for (var i = 0; i < cols.length; i++) {
+        if (kinds[i] === 'cat' && pats[p].test(cols[i]) && !skip.test(cols[i])) return i;
+      }
+    }
+    return -1;
+  }
+
+  function buildProject(matrix, name) {
+    if (!matrix.length) return null;
+    var h = 0, i, c;
+    for (i = 0; i < Math.min(10, matrix.length); i++) {
+      if (matrix[i].filter(function (x) { return x.trim(); }).length >= 2) { h = i; break; }
+    }
+    var header = matrix[h].map(function (x, j) { x = x.replace(/^﻿/, '').trim(); return x || ('Column ' + (j + 1)); });
+    var body = matrix.slice(h + 1);
+    var nCol = header.length;
+    var counts = [];
+    for (c = 0; c < nCol; c++) counts.push(0);
+    body.forEach(function (r) {
+      for (var cc = 0; cc < nCol; cc++) {
+        var v = r[cc];
+        if (v && v.length <= 300 && PROFILE_RE.test(v)) counts[cc]++;
+      }
+    });
+    var best = -1, bestScore = 0;
+    for (c = 0; c < nCol; c++) {
+      if (counts[c] > 0) {
+        var sc = counts[c] + (/linkedin/i.test(header[c]) ? 5 : 0) + (/url|link|profile/i.test(header[c]) ? 2 : 0);
+        if (sc > bestScore) { bestScore = sc; best = c; }
+      }
+    }
+    if (best < 0) return null;
+    var rowsU = body.filter(function (r) { return r[best] && extractProfile(r[best]); });
+    var keepIdx = [], kinds = [];
+    for (c = 0; c < nCol; c++) {
+      if (counts[c] > 0) { keepIdx.push(c); kinds.push('url'); continue; }
+      var vals = [];
+      for (i = 0; i < rowsU.length; i++) { var v = String(rowsU[i][c] || '').trim(); if (v) vals.push(v); }
+      if (!vals.length) continue;
+      if (CMT_RE.test(header[c])) { keepIdx.push(c); kinds.push('text'); continue; }
+      var maxLen = 0, set = {};
+      vals.forEach(function (x) { if (x.length > maxLen) maxLen = x.length; set[norm(x)] = 1; });
+      if (maxLen <= 60 && Object.keys(set).length <= 30) { keepIdx.push(c); kinds.push('cat'); }
+    }
+    var cols = keepIdx.map(function (k) { return header[k]; });
+    var rows = rowsU.map(function (r) {
+      return keepIdx.map(function (k, j) {
+        var v = String(r[k] == null ? '' : r[k]).trim();
+        var lim = kinds[j] === 'text' ? 1500 : 200;
+        return v.length > lim ? v.slice(0, lim) : v;
+      });
+    });
+    var p = {
+      id: 'p' + (++uid) + Date.now().toString(36),
+      name: name, cols: cols, kinds: kinds, rows: rows, on: true,
+      map: { url: keepIdx.indexOf(best), dec: pickOutcomeCol(cols, kinds), cmt: [] },
+      rules: {}
+    };
+    if (p.map.dec >= 0) ensureRules(p, p.map.dec);
+    cols.forEach(function (cn, j) {
+      if (kinds[j] === 'text' && !/copilot|icebreaker/i.test(cn)) p.map.cmt.push(j);
+    });
+    return p;
+  }
+
+  /* ---------- Rules and compiling ---------- */
+  function ensureRules(p, ci) {
+    var r = p.rules[ci] || (p.rules[ci] = {});
+    p.rows.forEach(function (row) {
+      var v = String(row[ci] || '').trim();
+      if (!v) return;
+      var k = norm(v);
+      if (!(k in r)) r[k] = classify(k) === 'yes' ? 'yes' : 'no';
+    });
+  }
+  function valueCounts(p, ci) {
+    var map = {}, list = [];
+    p.rows.forEach(function (row) {
+      var v = String(row[ci] || '').trim();
+      if (!v) return;
+      var k = norm(v);
+      if (!map[k]) { map[k] = { key: k, label: v, count: 0 }; list.push(map[k]); }
+      map[k].count++;
+    });
+    list.sort(function (a, b) { return b.count - a.count; });
+    return list;
+  }
+  function compile(p) {
+    var items = [], seen = {}, total = 0;
+    p.rows.forEach(function (row) {
+      var u = extractProfile(row[p.map.url]);
+      if (!u || seen[u.key]) return;
+      seen[u.key] = 1;
+      total++;
+      var v = p.map.dec >= 0 ? String(row[p.map.dec] || '').trim() : '';
+      if (!v || (p.rules[p.map.dec] || {})[norm(v)] !== 'yes') return;
+      var cm = [];
+      p.map.cmt.forEach(function (ci) {
+        var s = String(row[ci] || '').trim();
+        if (s) cm.push({ label: p.cols[ci], text: s });
+      });
+      items.push({ key: u.key, href: u.href, label: u.label, project: p.name, sample: !!p.sample, status: v, comments: cm });
+    });
+    return { items: items, total: total };
+  }
+  /* One entry per profile. A profile approved in several projects keeps every source. */
+  function mergePool() {
+    var map = {}, list = [];
+    projects.forEach(function (p) {
+      if (!p.on) return;
+      compile(p).items.forEach(function (it) {
+        var m = map[it.key];
+        if (!m) { m = map[it.key] = { key: it.key, href: it.href, label: it.label, sample: it.sample, sources: [] }; list.push(m); }
+        m.sources.push({ project: it.project, status: it.status, comments: it.comments });
+      });
+    });
+    return list;
+  }
+  function hay(it) {
+    if (it._h) return it._h;
+    var s = it.label;
+    it.sources.forEach(function (x) {
+      s += ' ' + x.project + ' ' + x.status;
+      x.comments.forEach(function (c) { s += ' ' + c.text; });
+    });
+    it._h = s.toLowerCase();
+    return it._h;
+  }
+
+  /* ---------- Per-target decisions ---------- */
+  function newSeed() { return Math.floor(Math.random() * 2147483646) + 1; }
+  function T() {
+    var n = store.current || 'My project';
+    if (!store.targets[n]) store.targets[n] = { order: 'sheet', seed: newSeed(), at: '', d: {} };
+    return store.targets[n];
+  }
+  function decided(it) { var e = T().d[it.key]; return !!(e && e[0]); }
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function seededShuffle(a, seed) {
+    var r = rng(seed), out = a.slice();
+    for (var i = out.length - 1; i > 0; i--) {
+      var j = Math.floor(r() * (i + 1));
+      var t = out[i]; out[i] = out[j]; out[j] = t;
+    }
+    return out;
+  }
+
+  /* ---------- Storage ---------- */
+  function saveProj() {
+    try {
+      localStorage.setItem(PROJ_KEY, JSON.stringify({ v: 1, projects: projects.filter(function (p) { return !p.sample; }) }));
+      persistFailed = false;
+    } catch (e) { persistFailed = true; }
+    renderNotes();
+  }
+  function saveDec() {
+    clearTimeout(decTimer);
+    try { localStorage.setItem(DEC_KEY, JSON.stringify(store)); } catch (e) { persistFailed = true; renderNotes(); }
+  }
+  var decTimer = null;
+  function saveDecSoon() { clearTimeout(decTimer); decTimer = setTimeout(saveDec, 200); }
+  window.addEventListener('pagehide', saveDec);
+  function load() {
+    try {
+      var s = JSON.parse(localStorage.getItem(PROJ_KEY) || 'null');
+      if (s && Array.isArray(s.projects)) {
+        projects = s.projects.filter(function (p) {
+          return p && p.id && Array.isArray(p.cols) && Array.isArray(p.rows) && p.map && typeof p.map.dec === 'number' && p.rules;
+        });
+      }
+    } catch (e) { projects = []; }
+    try {
+      var d = JSON.parse(localStorage.getItem(DEC_KEY) || 'null');
+      if (d && d.targets) store = { v: 1, current: d.current || 'My project', kw: d.kw || '', targets: d.targets };
+    } catch (e) {}
+  }
+
+  /* ---------- Setup view ---------- */
+  function renderNotes() {
+    var out = '';
+    problems.forEach(function (m) { out += '<div class="notice">' + esc(m) + '</div>'; });
+    if (persistFailed) out += '<div class="notice">This browser could not keep your data for next time. Your marks and sheets may be gone when you close the page.</div>';
+    $('notes').innerHTML = out;
+  }
+  function byId(id) { for (var i = 0; i < projects.length; i++) if (projects[i].id === id) return projects[i]; return null; }
+
+  function colOptions(p, kind, selected, noneLabel) {
+    var h = noneLabel ? '<option value="-1"' + (selected < 0 ? ' selected' : '') + '>' + esc(noneLabel) + '</option>' : '';
+    p.cols.forEach(function (c, i) {
+      if (p.kinds[i] === kind) h += '<option value="' + i + '"' + (i === selected ? ' selected' : '') + '>' + esc(c) + '</option>';
+    });
+    return h;
+  }
+
+  function projectHTML(p) {
+    var urlCols = 0, txt = [];
+    p.cols.forEach(function (c, i) { if (p.kinds[i] === 'url') urlCols++; if (p.kinds[i] === 'text') txt.push(i); });
+    var h = '<article class="proj" data-pid="' + p.id + '">';
+    h += '<div class="proj-head"><label class="inc"><input type="checkbox" data-act="inc"' + (p.on ? ' checked' : '') + '><span class="pname">' + esc(p.name) + '</span>' + (p.sample ? '<span class="tag">Sample</span>' : '') + '</label>';
+    h += '<button type="button" data-act="remove" aria-label="Remove ' + esc(p.name) + '">Remove</button></div>';
+    h += '<p class="p-stats" data-stats></p>';
+    h += '<details class="rules"' + (ui.open[p.id] ? ' open' : '') + '><summary>Rules</summary><div class="fields">';
+    h += '<div class="field"><label for="n-' + p.id + '">Project name</label><input type="text" id="n-' + p.id + '" data-act="name" value="' + esc(p.name) + '"></div>';
+    if (urlCols > 1) h += '<div class="field"><label for="u-' + p.id + '">LinkedIn URL column</label><select id="u-' + p.id + '" data-act="urlcol">' + colOptions(p, 'url', p.map.url) + '</select></div>';
+    h += '<div class="field"><label for="d-' + p.id + '">Outcome column</label><select id="d-' + p.id + '" data-act="dec">' + colOptions(p, 'cat', p.map.dec, p.map.dec < 0 ? 'Choose a column' : null) + '</select><p class="hint">The column that says what happened to each profile.</p></div>';
+    h += '<div class="vt-wrap"></div>';
+    if (txt.length) {
+      h += '<fieldset class="field"><legend>Comments to show with each profile</legend><div class="checks">';
+      txt.forEach(function (ci) {
+        h += '<label><input type="checkbox" data-act="cmt" value="' + ci + '"' + (p.map.cmt.indexOf(ci) >= 0 ? ' checked' : '') + '>' + esc(p.cols[ci]) + '</label>';
+      });
+      h += '</div></fieldset>';
+    }
+    return h + '</div></details></article>';
+  }
+
+  function rulesHTML(p) {
+    var ci = p.map.dec;
+    if (ci < 0) return '<p class="hint">Choose the column that says what happened to each profile.</p>';
+    ensureRules(p, ci);
+    var vc = valueCounts(p, ci);
+    var h = '<table class="vt"><caption>Which "' + esc(p.cols[ci]) + '" values count as approved? Ticked values are fed to you.</caption><thead><tr><th scope="col">Value</th><th scope="col" class="num">Profiles</th><th scope="col">Include</th></tr></thead><tbody>';
+    vc.forEach(function (v) {
+      var on = (p.rules[ci] || {})[v.key] === 'yes';
+      h += '<tr><td>' + esc(v.label) + '</td><td class="num">' + v.count + '</td><td><input type="checkbox" data-act="rule" data-col="' + ci + '" data-val="' + esc(v.key) + '"' + (on ? ' checked' : '') + ' aria-label="Include ' + esc(v.label) + '"></td></tr>';
+    });
+    return h + '</tbody></table>';
+  }
+
+  function articleOf(p) { return $('projects').querySelector('[data-pid="' + p.id + '"]'); }
+  function refreshRules(p) { var a = articleOf(p); if (a) a.querySelector('.vt-wrap').innerHTML = rulesHTML(p); }
+  function refreshStats(p) {
+    var a = articleOf(p);
+    if (!a) return;
+    var c = compile(p);
+    var el = a.querySelector('[data-stats]');
+    if (!c.items.length) el.innerHTML = '<span class="warn">No approved profiles yet. Open the rules and tick the outcomes that count as approved.</span>';
+    else el.textContent = fmt(c.items.length) + ' approved of ' + fmt(c.total) + ' profiles';
+  }
+
+  function usefulKeys() {
+    var t = T(), keys = {};
+    Object.keys(t.d).forEach(function (k) { if (t.d[k][0] === 'u') keys[k] = 1; });
+    return keys;
+  }
+  function updateStart() {
+    var pool = mergePool(), t = T();
+    var reviewed = 0, useful = 0;
+    pool.forEach(function (it) {
+      var e = t.d[it.key];
+      if (e && e[0]) { reviewed++; if (e[0] === 'u') useful++; }
+    });
+    var used = projects.filter(function (p) { return p.on; }).length;
+    $('pool').textContent = pool.length
+      ? fmt(pool.length) + ' approved profiles from ' + used + (used === 1 ? ' project' : ' projects') + ', with duplicates merged.' + (reviewed ? ' You have reviewed ' + fmt(reviewed) + ' for ' + store.current + '.' : '')
+      : 'Tick at least one project that has approved profiles.';
+    $('start').disabled = !pool.length;
+    $('start').textContent = reviewed ? 'Continue reviewing' : 'Start reviewing';
+    var ts = $('to-short');
+    ts.hidden = !useful;
+    ts.textContent = 'View useful list (' + useful + ')';
+    $('order').value = t.order;
+    $('reshuffle').hidden = t.order !== 'random';
+  }
+  function renderTargets() {
+    $('targets').innerHTML = Object.keys(store.targets).map(function (n) { return '<option value="' + esc(n) + '"></option>'; }).join('');
+  }
+  function commitTarget() {
+    var n = $('target').value.trim() || 'My project';
+    store.current = n;
+    T();
+    saveDec();
+    renderTargets();
+    $('target').value = n;
+  }
+
+  function renderSetup() {
+    var el = $('projects');
+    if (!projects.length) {
+      el.innerHTML = '<div class="drop"><button class="primary" id="pick" type="button">Choose spreadsheets</button>' +
+        '<p>or drop .xlsx, .xls or .csv files here. Each file becomes one source project, and you can add as many as you like.</p>' +
+        '<p>No sheet handy? <button class="link" id="sample" type="button">Try it with sample projects</button></p></div>';
+      $('pick').onclick = function () { $('file').click(); };
+      $('sample').onclick = loadSample;
+      $('startpanel').hidden = true;
+      return;
+    }
+    el.innerHTML = '<div class="projs">' + projects.map(projectHTML).join('') + '</div>' +
+      '<div class="addbar"><button type="button" class="primary" id="add">Add another spreadsheet</button><span class="hint">or drop files here</span></div>';
+    $('add').onclick = function () { $('file').click(); };
+    projects.forEach(function (p) { refreshRules(p); refreshStats(p); });
+    $('startpanel').hidden = false;
+    $('target').value = store.current;
+    renderTargets();
+    updateStart();
+  }
+
+  function addProject(p) {
+    var idx = -1;
+    projects.forEach(function (q, i) { if (q.name === p.name) idx = i; });
+    if (idx >= 0) { p.id = projects[idx].id; projects[idx] = p; } else projects.push(p);
+  }
+
+  function readOne(file) {
+    return new Promise(function (resolve) {
+      var fr = new FileReader();
+      fr.onload = function () {
+        setTimeout(function () {
+          try {
+            var wb = XLSX.read(new Uint8Array(fr.result), { type: 'array', codepage: 65001 });
+            var base = file.name.replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+            var added = 0;
+            wb.SheetNames.forEach(function (sn) {
+              var p = buildProject(sheetToMatrix(wb.Sheets[sn]), wb.SheetNames.length > 1 ? base + ' · ' + sn : base);
+              if (p) { addProject(p); added++; }
+            });
+            if (!added) problems.push(file.name + ' has no LinkedIn profile URLs, so it was not added.');
+          } catch (e) { problems.push(file.name + ' could not be read. Use .xlsx, .xls or .csv files.'); }
+          resolve();
+        }, 0);
+      };
+      fr.onerror = function () { problems.push(file.name + ' could not be opened.'); resolve(); };
+      fr.readAsArrayBuffer(file);
+    });
+  }
+  function readFiles(list) {
+    var files = Array.prototype.slice.call(list || []);
+    if (!files.length) return;
+    problems = [];
+    if (!window.XLSX) { problems.push('The spreadsheet reader did not load. Check your connection and reload the page.'); renderNotes(); return; }
+    $('busy').textContent = 'Reading ' + files.length + (files.length === 1 ? ' file' : ' files') + '…';
+    files.reduce(function (chain, f) { return chain.then(function () { return readOne(f); }); }, Promise.resolve()).then(function () {
+      $('busy').textContent = '';
+      renderSetup();
+      saveProj();
+    });
+  }
+
+  function loadSample() {
+    var a = [
+      ['LinkedIn URL', 'Outreach Status', 'Sourcer Comments', 'TM Feedback'],
+      ['linkedin.com/in/sample-profile-01', 'Outreach Initiated', 'Eight years of marine robotics test work, very hands-on.', ''],
+      ['linkedin.com/in/sample-profile-02', 'Rejected', 'Strong vehicle design background.', 'Not a US person, so we skip.'],
+      ['linkedin.com/in/sample-profile-03', 'Interested', 'Defence contractor, three years on UAV airframes.', 'Replied the same day and open to a call.'],
+      ['linkedin.com/in/sample-profile-04', 'Not Interested', 'Early career, two internships in unmanned systems.', ''],
+      ['linkedin.com/in/sample-profile-05', 'Maybe Later', 'Senior generalist with a lot of FEA work.', 'Too senior for this level. Hold for now.']
+    ];
+    var b = [
+      ['LinkedIn URL', 'Outreach Status', 'Sourcer Comments', 'Client Comments'],
+      ['linkedin.com/in/sample-profile-03', 'Outreach Initiated', 'UAV airframes and composites, good school.', 'Would outreach a bunch of people like this.'],
+      ['linkedin.com/in/sample-profile-06', 'Outreach Initiated', 'Plant manager at a mid-size machining company.', ''],
+      ['linkedin.com/in/sample-profile-07', 'SS Approved', 'Lean manufacturing lead, ten years in aerospace.', 'Quality looks right but not relevant. Calibrate on borderline profiles.'],
+      ['linkedin.com/in/sample-profile-08', 'Rejected', 'Mostly software work.', 'Not what we are looking for.']
+    ];
+    var p1 = buildProject(a, 'Sample: Marine robotics');
+    var p2 = buildProject(b, 'Sample: Manufacturing lead');
+    [p1, p2].forEach(function (p) { p.sample = true; addProject(p); });
+    renderSetup();
+  }
+
+  /* Setup events */
+  var projEl = $('projects');
+  projEl.addEventListener('toggle', function (e) {
+    var d = e.target;
+    if (d && d.tagName === 'DETAILS' && d.classList.contains('rules')) {
+      var a = d.closest('.proj');
+      if (a) ui.open[a.getAttribute('data-pid')] = d.open;
+    }
+  }, true);
+  projEl.addEventListener('change', function (e) {
+    var t = e.target, act = t.getAttribute('data-act');
+    if (!act) return;
+    var a = t.closest('.proj');
+    var p = a && byId(a.getAttribute('data-pid'));
+    if (!p) return;
+    if (act === 'inc') { p.on = t.checked; updateStart(); saveProj(); }
+    else if (act === 'rule') { p.rules[+t.getAttribute('data-col')][t.getAttribute('data-val')] = t.checked ? 'yes' : 'no'; refreshStats(p); updateStart(); saveProj(); }
+    else if (act === 'dec') {
+      p.map.dec = +t.value;
+      if (p.map.dec >= 0) ensureRules(p, p.map.dec);
+      refreshRules(p); refreshStats(p); updateStart(); saveProj();
+    }
+    else if (act === 'urlcol') { p.map.url = +t.value; refreshStats(p); updateStart(); saveProj(); }
+    else if (act === 'cmt') {
+      var sel = [];
+      a.querySelectorAll('input[data-act="cmt"]').forEach(function (cb) { if (cb.checked) sel.push(+cb.value); });
+      p.map.cmt = sel; saveProj();
+    }
+  });
+  var projTimer = null;
+  projEl.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t.getAttribute('data-act') !== 'name') return;
+    var a = t.closest('.proj');
+    var p = a && byId(a.getAttribute('data-pid'));
+    if (!p) return;
+    p.name = t.value;
+    a.querySelector('.pname').textContent = t.value || 'Untitled project';
+    clearTimeout(projTimer);
+    projTimer = setTimeout(saveProj, 400);
+  });
+  projEl.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t.getAttribute && t.getAttribute('data-act') === 'remove') {
+      var a = t.closest('.proj');
+      projects = projects.filter(function (p) { return p.id !== a.getAttribute('data-pid'); });
+      renderSetup(); saveProj();
+    }
+  });
+  $('file').addEventListener('change', function (e) { readFiles(e.target.files); e.target.value = ''; });
+  $('target').addEventListener('change', function () { commitTarget(); updateStart(); });
+  $('order').addEventListener('change', function (e) { T().order = e.target.value; saveDec(); updateStart(); });
+  $('reshuffle').addEventListener('click', function () { var t = T(); t.seed = newSeed(); t.at = ''; saveDec(); updateStart(); });
+  $('start').addEventListener('click', startFeed);
+  $('to-short').addEventListener('click', function () { commitTarget(); goView('short'); });
+  var setupEl = $('v-setup');
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    setupEl.addEventListener(ev, function (e) { e.preventDefault(); setupEl.classList.add('over'); });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    setupEl.addEventListener(ev, function (e) { e.preventDefault(); setupEl.classList.remove('over'); });
+  });
+  setupEl.addEventListener('drop', function (e) { readFiles(e.dataTransfer && e.dataTransfer.files); });
+
+  /* ---------- Views ---------- */
+  function show(v) {
+    view = v;
+    $('v-setup').hidden = v !== 'setup';
+    $('v-feed').hidden = v !== 'feed';
+    $('v-short').hidden = v !== 'short';
+    $('lede').hidden = v !== 'setup';
+    window.scrollTo(0, 0);
+  }
+  function goView(v) {
+    if (v === 'setup') { show('setup'); renderSetup(); }
+    else if (v === 'short') { show('short'); renderShort(); }
+    else if (v === 'feed') { startFeed(); }
+  }
+
+  /* ---------- Feed ---------- */
+  function buildFeed() {
+    var t = T();
+    var pool = mergePool();
+    var ordered = t.order === 'random' ? seededShuffle(pool, t.seed) : pool;
+    var words = (store.kw || '').toLowerCase().split(/\s+/).filter(Boolean);
+    var list = words.length ? ordered.filter(function (it) {
+      var h = hay(it);
+      return words.every(function (w) { return h.indexOf(w) >= 0; });
+    }) : ordered;
+    var idx = -1, k;
+    if (t.at) for (k = 0; k < list.length; k++) if (list[k].key === t.at) { idx = k; break; }
+    if (idx < 0) for (k = 0; k < list.length; k++) if (!decided(list[k])) { idx = k; break; }
+    feed = { list: list, i: idx < 0 ? 0 : idx };
+  }
+
+  function startFeed() {
+    commitTarget();
+    if (!mergePool().length) return;
+    buildFeed();
+    show('feed');
+    var h = '<div class="hud"><span id="fpos"></span><span id="fstat"></span></div><div class="bar" aria-hidden="true"><i id="fbar"></i></div>';
+    h += '<div class="field"><label for="kw">Keyword in comments</label><input type="search" id="kw" placeholder="For example marine, UUV or Boston" value="' + esc(store.kw || '') + '" autocomplete="off"></div>';
+    h += '<div id="fcard"></div>';
+    h += '<div class="end-row"><button type="button" class="link" id="f-setup">Back to setup</button><button type="button" class="link" id="f-short">View useful list</button></div>';
+    $('v-feed').innerHTML = h;
+    var kwTimer = null;
+    $('kw').addEventListener('input', function (e) {
+      clearTimeout(kwTimer);
+      kwTimer = setTimeout(function () {
+        store.kw = e.target.value.trim();
+        saveDecSoon();
+        var cur = feed.list[feed.i];
+        if (cur) T().at = cur.key;
+        buildFeed();
+        renderCard();
+      }, 200);
+    });
+    $('f-setup').onclick = function () { goView('setup'); };
+    $('f-short').onclick = function () { goView('short'); };
+    renderCard();
+  }
+
+  function updateHud() {
+    var list = feed.list, n = list.length, t = T();
+    var reviewed = 0, useful = 0;
+    list.forEach(function (it) {
+      var e = t.d[it.key];
+      if (e && e[0]) { reviewed++; if (e[0] === 'u') useful++; }
+    });
+    $('fpos').textContent = n ? 'Profile ' + Math.min(feed.i + 1, n) + ' of ' + fmt(n) : 'No profiles';
+    $('fstat').textContent = fmt(reviewed) + ' reviewed · ' + fmt(useful) + ' useful';
+    $('fbar').style.width = (n ? reviewed / n * 100 : 0) + '%';
+    var fs = $('f-short');
+    if (fs) fs.textContent = 'View useful list (' + Object.keys(usefulKeys()).length + ')';
+  }
+
+  var DEC_LABEL = { u: 'Useful', n: 'Not useful', s: 'Skipped' };
+
+  function renderCard() {
+    var el = $('fcard'), list = feed.list, t = T();
+    updateHud();
+    if (!list.length) {
+      el.innerHTML = '<div class="idle">' + (store.kw ? 'No approved profiles match "' + esc(store.kw) + '". Try a different keyword.' : 'No approved profiles to show.') + '</div>';
+      return;
+    }
+    if (feed.i >= list.length) {
+      var left = list.filter(function (it) { return !decided(it); }).length;
+      el.innerHTML = '<article class="card endcard"><h2>End of the feed</h2><p>' + (left ? fmt(left) + ' profiles in this feed are still not reviewed.' : 'You have reviewed every profile in this feed.') + '</p>' +
+        '<div class="actions">' + (left ? '<button type="button" class="primary" id="jump">Go to first not reviewed</button>' : '') + '<button type="button" id="prev">Previous</button></div></article>';
+      if (left) $('jump').onclick = function () {
+        for (var k = 0; k < list.length; k++) if (!decided(list[k])) { go(k); return; }
+      };
+      $('prev').onclick = function () { go(list.length - 1); };
+      return;
+    }
+    var it = list[feed.i], d = t.d[it.key] || ['', ''];
+    t.at = it.key;
+    saveDecSoon();
+    var h = '<article class="card"><div class="profile"><p class="url">' + esc(it.label) + '</p>';
+    h += it.sample ? '<p class="hint">This profile is made up, so there is no page to open.</p>'
+      : '<a class="btn" href="' + esc(it.href) + '" target="_blank" rel="noopener noreferrer">Open profile on LinkedIn</a>';
+    h += '</div>';
+    it.sources.forEach(function (s) {
+      h += '<div class="src"><div class="src-head"><span class="sname">' + esc(s.project) + '</span><span class="status">' + esc(s.status) + '</span></div>';
+      if (s.comments.length) {
+        h += '<ul class="cms">';
+        s.comments.forEach(function (c) { h += '<li><span class="who">' + esc(c.label) + '</span><span class="txt">' + esc(c.text) + '</span></li>'; });
+        h += '</ul>';
+      } else h += '<p class="hint">No comments were recorded for this profile.</p>';
+      h += '</div>';
+    });
+    h += '<h2 class="q">Is this profile useful for ' + esc(store.current) + '?</h2>';
+    h += '<div class="decide"><button type="button" class="dec' + (d[0] === 'u' ? ' on-u' : '') + '" id="d-u">Useful<kbd>Y</kbd></button>' +
+      '<button type="button" class="dec' + (d[0] === 'n' ? ' on-n' : '') + '" id="d-n">Not useful<kbd>N</kbd></button>' +
+      '<button type="button" class="dec' + (d[0] === 's' ? ' on-s' : '') + '" id="d-s">Skip<kbd>S</kbd></button></div>';
+    if (d[0]) h += '<p class="hint">You marked this ' + DEC_LABEL[d[0]].toLowerCase() + '. Choose again to change it.</p>';
+    h += '<div class="field"><label for="note">Note (optional)</label><textarea class="brief-input" id="note" placeholder="Why it fits, or what to do with it">' + esc(d[1] || '') + '</textarea></div>';
+    h += '<div class="nav"><button type="button" id="prev"' + (feed.i === 0 ? ' disabled' : '') + '>Previous</button><button type="button" id="nxt">Next</button></div></article>';
+    el.innerHTML = h;
+    $('d-u').onclick = function () { decide('u'); };
+    $('d-n').onclick = function () { decide('n'); };
+    $('d-s').onclick = function () { decide('s'); };
+    $('prev').onclick = function () { go(feed.i - 1); };
+    $('nxt').onclick = function () { go(feed.i + 1); };
+    $('note').addEventListener('input', function (e) {
+      var cur = T().d[it.key] || ['', ''];
+      cur[1] = e.target.value;
+      if (!cur[0] && !cur[1].trim()) delete T().d[it.key]; else T().d[it.key] = cur;
+      saveDecSoon();
+    });
+  }
+
+  function go(n) {
+    feed.i = Math.max(0, Math.min(n, feed.list.length));
+    renderCard();
+    window.scrollTo(0, 0);
+  }
+  function decide(c) {
+    if (!feed || feed.i >= feed.list.length) return;
+    var it = feed.list[feed.i];
+    T().d[it.key] = [c, ($('note').value || '').trim()];
+    saveDecSoon();
+    go(feed.i + 1);
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (view !== 'feed' || !feed || e.ctrlKey || e.metaKey || e.altKey) return;
+    var tg = e.target;
+    if (tg && /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName)) return;
+    var k = e.key.toLowerCase();
+    if (k === 'y') decide('u');
+    else if (k === 'n') decide('n');
+    else if (k === 's') decide('s');
+    else if (k === 'arrowright') go(feed.i + 1);
+    else if (k === 'arrowleft') go(feed.i - 1);
+  });
+
+  /* ---------- Useful list ---------- */
+  function usefulItems() {
+    var t = T();
+    return mergePool().filter(function (it) { var e = t.d[it.key]; return e && e[0] === 'u'; });
+  }
+  function csvCell(s) {
+    s = String(s == null ? '' : s);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function buildCsv(items) {
+    var t = T();
+    var rows = [['LinkedIn URL', 'Reviewed for', 'Source projects', 'Outreach status', 'Comments', 'Note']];
+    items.forEach(function (it) {
+      var cm = [];
+      it.sources.forEach(function (s) { s.comments.forEach(function (c) { cm.push(s.project + ' - ' + c.label + ': ' + c.text); }); });
+      rows.push([it.href, store.current,
+        it.sources.map(function (s) { return s.project; }).join('; '),
+        it.sources.map(function (s) { return s.status; }).join('; '),
+        cm.join(' | '), (t.d[it.key] && t.d[it.key][1]) || '']);
+    });
+    return '﻿' + rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n');
+  }
+  function download(name, text) {
+    var blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+
+  function renderShort() {
+    var items = usefulItems(), t = T();
+    var h = '<div class="short-head"><h2>Useful for ' + esc(store.current) + ' (' + items.length + ')</h2><div class="actions">' +
+      '<button type="button" id="copy"' + (items.length ? '' : ' disabled') + '>Copy URLs</button>' +
+      '<button type="button" class="primary" id="csv"' + (items.length ? '' : ' disabled') + '>Download CSV</button></div></div>';
+    h += '<div id="fallback"></div>';
+    if (!items.length) {
+      h += '<div class="idle">Nothing marked useful yet. Mark profiles Useful in the feed and they appear here.</div>';
+    } else {
+      h += '<ul class="sl">';
+      items.forEach(function (it, idx) {
+        var e = t.d[it.key];
+        h += '<li><div class="row">' + (it.sample ? '<span class="url">' + esc(it.label) + '</span>' : '<a class="u" href="' + esc(it.href) + '" target="_blank" rel="noopener noreferrer">' + esc(it.label) + '</a>') +
+          '<button type="button" data-rm="' + idx + '" aria-label="Remove ' + esc(it.label) + ' from the useful list">Remove</button></div>';
+        h += '<div class="chips">' + it.sources.map(function (s) { return '<span class="chip">' + esc(s.project) + ' · ' + esc(s.status) + '</span>'; }).join('') + '</div>';
+        if (e && e[1]) h += '<p class="note">' + esc(e[1]) + '</p>';
+        var cms = [];
+        it.sources.forEach(function (s) { s.comments.forEach(function (c) { cms.push({ label: s.project + ' · ' + c.label, text: c.text }); }); });
+        if (cms.length) {
+          h += '<details class="more"><summary>Comments (' + cms.length + ')</summary><ul class="cms">';
+          cms.forEach(function (c) { h += '<li><span class="who">' + esc(c.label) + '</span><span class="txt">' + esc(c.text) + '</span></li>'; });
+          h += '</ul></details>';
+        }
+        h += '</li>';
+      });
+      h += '</ul>';
+    }
+    h += '<div class="end-row"><button type="button" class="link" id="s-feed">Back to the feed</button><button type="button" class="link" id="s-setup">Back to setup</button></div>';
+    $('v-short').innerHTML = h;
+    $('s-feed').onclick = function () { startFeed(); };
+    $('s-setup').onclick = function () { goView('setup'); };
+    var csvBtn = $('csv'), copyBtn = $('copy');
+    if (csvBtn) csvBtn.onclick = function () {
+      download('useful-profiles-' + (store.current.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'list') + '.csv', buildCsv(items));
+    };
+    if (copyBtn) copyBtn.onclick = function () {
+      var text = items.map(function (it) { return it.href; }).join('\n');
+      var ok = function () { copyBtn.textContent = 'Copied'; setTimeout(function () { copyBtn.textContent = 'Copy URLs'; }, 1500); };
+      var fail = function () {
+        $('fallback').innerHTML = '<div class="fallback"><textarea id="fbText" readonly aria-label="URLs to copy"></textarea></div>';
+        var ta = $('fbText'); ta.value = text; ta.focus(); ta.select();
+      };
+      try { navigator.clipboard.writeText(text).then(ok, fail); } catch (err) { fail(); }
+    };
+    $('v-short').querySelectorAll('[data-rm]').forEach(function (b) {
+      b.onclick = function () {
+        var it = items[+b.getAttribute('data-rm')];
+        var e = T().d[it.key] || ['', ''];
+        e[0] = '';
+        if (!e[1]) delete T().d[it.key]; else T().d[it.key] = e;
+        saveDec();
+        renderShort();
+      };
+    });
+  }
+
+  load();
+  T();
+  renderSetup();
+  renderNotes();
+})();
+</script>
+</body>
+</html>
