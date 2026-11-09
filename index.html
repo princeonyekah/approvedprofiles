@@ -197,6 +197,8 @@ details.rules > summary { cursor: pointer; color: var(--accent); font-weight: 50
 .start-row { display: flex; align-items: flex-end; gap: 12px 16px; flex-wrap: wrap; }
 .start-row .field { width: 180px; }
 .start-row button.primary { padding: 10px 20px; font-size: 16px; }
+.restart-row { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.restart-row .hint { flex-basis: 100%; }
 .pool { margin: 0; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
 
 /* Feed */
@@ -295,6 +297,11 @@ details.more .cms { margin-top: 8px; }
         <button type="button" class="primary" id="start">Start reviewing</button>
       </div>
       <p class="pool" id="pool"></p>
+      <div class="restart-row" id="restartrow" hidden>
+        <button type="button" id="restart">Restart from the first profile</button>
+        <button type="button" class="link" id="wipe"></button>
+        <p class="hint">Restart opens the feed at profile 1 in sheet order and keeps your marks. Clearing marks also wipes every Useful, Not useful and Skip for this project name.</p>
+      </div>
       <div><button type="button" class="link" id="to-short" hidden></button></div>
     </div>
     <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.csv,.tsv,.ods" multiple hidden>
@@ -549,6 +556,7 @@ details.more .cms { margin-top: 8px; }
     try { localStorage.setItem(DEC_KEY, JSON.stringify(store)); } catch (e) { persistFailed = true; renderNotes(); }
   }
   var decTimer = null;
+  var wipeArmed = false, wipeTimer = null;
   function saveDecSoon() { clearTimeout(decTimer); decTimer = setTimeout(saveDec, 200); }
   window.addEventListener('pagehide', saveDec);
   function load() {
@@ -652,6 +660,11 @@ details.more .cms { margin-top: 8px; }
     ts.textContent = 'View useful list (' + useful + ')';
     $('order').value = t.order;
     $('reshuffle').hidden = t.order !== 'random';
+    var marks = Object.keys(t.d).length;
+    $('restartrow').hidden = !pool.length || !(marks || t.at);
+    $('wipe').hidden = !marks;
+    wipeArmed = false;
+    $('wipe').textContent = 'Clear my ' + fmt(marks) + (marks === 1 ? ' mark' : ' marks') + ' and restart';
   }
   function renderTargets() {
     $('targets').innerHTML = Object.keys(store.targets).map(function (n) { return '<option value="' + esc(n) + '"></option>'; }).join('');
@@ -802,7 +815,31 @@ details.more .cms { margin-top: 8px; }
   $('target').addEventListener('change', function () { commitTarget(); updateStart(); });
   $('order').addEventListener('change', function (e) { T().order = e.target.value; saveDec(); updateStart(); });
   $('reshuffle').addEventListener('click', function () { var t = T(); t.seed = newSeed(); t.at = ''; saveDec(); updateStart(); });
-  $('start').addEventListener('click', startFeed);
+  $('start').addEventListener('click', function () { startFeed(); });
+  $('restart').addEventListener('click', function () {
+    commitTarget();
+    var t = T();
+    t.order = 'sheet'; t.at = ''; store.kw = '';
+    saveDec();
+    startFeed(true);
+  });
+  $('wipe').addEventListener('click', function () {
+    var b = $('wipe'), t = T(), n = Object.keys(t.d).length;
+    if (!wipeArmed) {
+      wipeArmed = true;
+      b.textContent = 'Sure? This clears ' + fmt(n) + (n === 1 ? ' mark' : ' marks') + ' for ' + store.current;
+      clearTimeout(wipeTimer);
+      wipeTimer = setTimeout(function () { wipeArmed = false; updateStart(); }, 5000);
+      return;
+    }
+    clearTimeout(wipeTimer);
+    wipeArmed = false;
+    commitTarget();
+    t = T();
+    t.d = {}; t.at = ''; t.order = 'sheet'; store.kw = '';
+    saveDec();
+    startFeed(true);
+  });
   $('to-short').addEventListener('click', function () { commitTarget(); goView('short'); });
   var setupEl = $('v-setup');
   ['dragenter', 'dragover'].forEach(function (ev) {
@@ -829,7 +866,7 @@ details.more .cms { margin-top: 8px; }
   }
 
   /* ---------- Feed ---------- */
-  function buildFeed() {
+  function buildFeed(top) {
     var t = T();
     var pool = mergePool();
     var ordered = t.order === 'random' ? seededShuffle(pool, t.seed) : pool;
@@ -839,20 +876,22 @@ details.more .cms { margin-top: 8px; }
       return words.every(function (w) { return h.indexOf(w) >= 0; });
     }) : ordered;
     var idx = -1, k;
-    if (t.at) for (k = 0; k < list.length; k++) if (list[k].key === t.at) { idx = k; break; }
+    if (top) idx = 0;
+    else if (t.at) for (k = 0; k < list.length; k++) if (list[k].key === t.at) { idx = k; break; }
     if (idx < 0) for (k = 0; k < list.length; k++) if (!decided(list[k])) { idx = k; break; }
     feed = { list: list, i: idx < 0 ? 0 : idx };
   }
 
-  function startFeed() {
+  function startFeed(top) {
     commitTarget();
     if (!mergePool().length) return;
-    buildFeed();
+    if (top === true) T().at = '';
+    buildFeed(top === true);
     show('feed');
     var h = '<div class="hud"><span id="fpos"></span><span id="fstat"></span></div><div class="bar" aria-hidden="true"><i id="fbar"></i></div>';
     h += '<div class="field"><label for="kw">Keyword in comments</label><input type="search" id="kw" placeholder="For example marine, UUV or Boston" value="' + esc(store.kw || '') + '" autocomplete="off"></div>';
     h += '<div id="fcard"></div>';
-    h += '<div class="end-row"><button type="button" class="link" id="f-setup">Back to setup</button><button type="button" class="link" id="f-short">View useful list</button></div>';
+    h += '<div class="end-row"><button type="button" class="link" id="f-first">Go to first profile</button><button type="button" class="link" id="f-setup">Back to setup</button><button type="button" class="link" id="f-short">View useful list</button></div>';
     $('v-feed').innerHTML = h;
     var kwTimer = null;
     $('kw').addEventListener('input', function (e) {
@@ -866,6 +905,7 @@ details.more .cms { margin-top: 8px; }
         renderCard();
       }, 200);
     });
+    $('f-first').onclick = function () { if (feed.list.length) go(0); };
     $('f-setup').onclick = function () { goView('setup'); };
     $('f-short').onclick = function () { goView('short'); };
     renderCard();
@@ -897,7 +937,8 @@ details.more .cms { margin-top: 8px; }
     if (feed.i >= list.length) {
       var left = list.filter(function (it) { return !decided(it); }).length;
       el.innerHTML = '<article class="card endcard"><h2>End of the feed</h2><p>' + (left ? fmt(left) + ' profiles in this feed are still not reviewed.' : 'You have reviewed every profile in this feed.') + '</p>' +
-        '<div class="actions">' + (left ? '<button type="button" class="primary" id="jump">Go to first not reviewed</button>' : '') + '<button type="button" id="prev">Previous</button></div></article>';
+        '<div class="actions">' + (left ? '<button type="button" class="primary" id="jump">Go to first not reviewed</button>' : '') + '<button type="button" id="prev">Previous</button><button type="button" id="again">Back to the first profile</button></div></article>';
+      $('again').onclick = function () { go(0); };
       if (left) $('jump').onclick = function () {
         for (var k = 0; k < list.length; k++) if (!decided(list[k])) { go(k); return; }
       };
